@@ -59,6 +59,38 @@ Android отказывает AudioTrack в быстром (FAST) пути и м�
 
 ---
 
+## Устранение неполадок (FAQ)
+
+### 🔊 Звук играет одновременно и на ПК, и на телевизоре
+
+Настройка Moonlight **«Play audio on PC»** работает только со стеком NVIDIA
+(GeForce Experience / Shield) и **не действует на Sunshine**. Если во время
+стриминга звук слышен и на компьютере-хосте, и на клиенте — это нормальное
+поведение Sunshine, а не баг этой сборки. Чтобы заглушить ПК:
+
+1. Открой Web UI Sunshine: `http://localhost:47990`
+2. Перейди в **Config → Audio/Video**
+3. Установи **Virtual Sink = Steam Streaming Speakers** (тихое виртуальное
+   устройство), а **Audio Sink** оставь пустым.
+4. Примени настройки и перезапусти Sunshine.
+
+Если «Steam Streaming Speakers» нет в списке устройств Windows — включи в
+Sunshine опцию **Install Steam audio drivers** (или один раз запусти Steam
+Remote Play, чтобы драйвер установился).
+
+### 🔁 После повторного открытия стрима пропал звук
+
+Обновись до **v2** этой сборки (в ней добавлена задержка пересоздания
+AAudio-стрима). Если проблема остаётся — отключи **«Enable AAudio
+low-latency renderer»** в настройках аудио.
+
+### 🔇 Нет звука вообще
+
+Проверь в настройках Moonlight: **«Enable audio FX»** выключен, в аудио выбран
+**Stereo (2.0)**, **«Enable AAudio low-latency renderer»** включен.
+
+---
+
 ## Файлы
 
 | Файл | Описание |
