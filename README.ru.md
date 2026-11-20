@@ -1,0 +1,125 @@
+**[English](README.md) | [Русский](README.ru.md)**
+
+# Moonlight AAudio Low-Latency Fix (Google TV Streamer / Android TV 14)
+
+Сборка **Moonlight v12.2** с нативным **AAudio low-latency** аудио-рендерером.
+
+Это решает известную проблему **задержки звука (~0.5–1 сек)** на устройствах, где
+Android отказывает AudioTrack в быстром (FAST) пути и молча отправляет звук в
+глубокий буфер `DEEP_BUFFER` — прежде всего **Google TV Streamer**, а также
+некоторые другие Android-приставки/ТВ на Android TV 14.
+
+---
+
+## TL;DR
+
+- **Скачай APK** в разделе [Releases](../../releases) и установи его.
+- Фикс работает автоматически, но теперь его можно управлять:
+  в разделе **Audio Settings** есть настройка
+  **«Enable AAudio low-latency renderer»** (включена по умолчанию).
+- Если звук всё ещё отстаёт — убедись, что в настройках Moonlight:
+  - **«Enable audio FX» выключен** (AAudio работает только без аудиоэффектов);
+  - выбран **Stereo (2.0)**, а не 5.1/7.1 (фикс покрывает только стерео);
+  - **«Enable AAudio low-latency renderer» включен**.
+
+---
+
+## О проблеме
+
+Оригинальный тикет: [moonlight-stream/moonlight-android#1423](https://github.com/moonlight-stream/moonlight-android/issues/1423)
+
+Известный баг: на Google TV Streamer (Android TV 14) звук отстаёт от картинки на
+~0.5–1 секунду, при этом видео и ввод откликаются нормально. Проблема проявляется
+не только в Moonlight, но и в Steam Link, GeForce Now и т.д. Причина — на уровне
+прошивки/ROM: Android использует очень длинный аудио-буфер для выхода HDMI и
+игнорирует запрошенный FAST-путь, перенаправляя звук в `DEEP_BUFFER`.
+
+Это не баг самого Moonlight, а особенность конкретных устройств.
+
+---
+
+## Как это исправляет сборка
+
+В Moonlight добавлен **нативный AAudio-рендерер** (C, JNI):
+
+- На Android O+ (API 26+) и **только когда выключены системные аудиоэффекты**
+  используется **AAudio MNAP**-путь (exclusive, LOW_LATENCY) — он даёт
+  минимальную задержку.
+- Если AAudio недоступен или не смог открыться — автоматический откат (fallback)
+  на стандартный AudioTrack.
+- Кольцевой буфер на нативной стороне не даёт задержке расти.
+- Размеры буферов оптимизированы для минимальной задержки.
+- Добавлена настройка **«Enable AAudio low-latency renderer»** в разделе
+  Audio Settings — можно отключить AAudio, если устройство ведёт себя
+  нестабильно.
+- Исправлен баг повторного подключения (после выхода из стрима и повторного
+  входа звук мог пропадать) — добавлена задержка пересоздания стрима.
+
+> ⚠️ **Известное ограничение:** фикс работает для **стерео (2.0)**. Режимы
+> surround (5.1/7.1) не покрываются — при выборе surround задержка может
+> вернуться.
+
+---
+
+## Устранение неполадок (FAQ)
+
+### 🔊 Звук играет одновременно и на ПК, и на телевизоре
+
+Настройка Moonlight **«Play audio on PC»** работает только со стеком NVIDIA
+(GeForce Experience / Shield) и **не действует на Sunshine**. Если во время
+стриминга звук слышен и на компьютере-хосте, и на клиенте — это нормальное
+поведение Sunshine, а не баг этой сборки. Чтобы заглушить ПК:
+
+1. Открой Web UI Sunshine: `http://localhost:47990`
+2. Перейди в **Config → Audio/Video**
+3. Установи **Virtual Sink = Steam Streaming Speakers** (тихое виртуальное
+   устройство), а **Audio Sink** оставь пустым.
+4. Примени настройки и перезапусти Sunshine.
+
+Если «Steam Streaming Speakers» нет в списке устройств Windows — включи в
+Sunshine опцию **Install Steam audio drivers** (или один раз запусти Steam
+Remote Play, чтобы драйвер установился).
+
+### 🔁 После повторного открытия стрима пропал звук
+
+Обновись до **v2** этой сборки (в ней добавлена задержка пересоздания
+AAudio-стрима). Если проблема остаётся — отключи **«Enable AAudio
+low-latency renderer»** в настройках аудио.
+
+### 🔇 Нет звука вообще
+
+Проверь в настройках Moonlight: **«Enable audio FX»** выключен, в аудио выбран
+**Stereo (2.0)**, **«Enable AAudio low-latency renderer»** включен.
+
+---
+
+## Файлы
+
+| Файл | Описание |
+|---|---|
+| `Moonlight-12.2-AAudioFix-release.apk` | Готовая подписанная сборка для установки |
+| `aaudio-fix.patch` | Патч к исходникам Moonlight v12.2 |
+
+---
+
+## Авторство
+
+- **Основа:** официальный [moonlight-stream/moonlight-android](https://github.com/moonlight-stream/moonlight-android) v12.2
+- **AAudio-фикс:** [@olibols](https://github.com/olibols), PR [ClassicOldSong#567](https://github.com/ClassicOldSong/moonlight-android/pull/567) (коммит `fa0a309`)
+- **Сборка/упаковка:** этот репозиторий
+
+## Лицензия
+
+Проект распространяется под **GPLv3** (как и Moonlight).
+Пожалуйста, сохраняйте ссылки на авторство.
+
+---
+
+## Как собрать самому
+
+1. `git clone --depth 1 https://github.com/moonlight-stream/moonlight-android.git`
+2. `cd moonlight-android`
+3. `git submodule update --init --recursive`
+4. Примени патч: `git apply aaudio-fix.patch`
+5. Собери: `./gradlew :app:assembleNonRootRelease`
+   (нужны Android SDK: platform 37, build-tools, NDK 29.0.14206865)
